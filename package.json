@@ -1,0 +1,23 @@
+{
+  "name": "dm-session-reminders",
+  "version": "0.1.0",
+  "description": "Periodic popup reminders for Dungeon Masters, with a checklist of items to cover during a session.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --skipLibCheck"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.14.4",
+    "tslib": "^2.8.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.1.0"
+  }
+}

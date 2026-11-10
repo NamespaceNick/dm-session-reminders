@@ -1,0 +1,10 @@
+{
+  "id": "dm-session-reminders",
+  "name": "DM Session Reminders",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.7",
+  "description": "Pop up a reminder checklist every X minutes while you run a game session.",
+  "author": "NamespaceNick",
+  "authorUrl": "https://github.com/NamespaceNick",
+  "isDesktopOnly": false
+}

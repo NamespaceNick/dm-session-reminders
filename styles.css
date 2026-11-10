@@ -1,0 +1,191 @@
+/* All colors, fonts, radii and spacing come from Obsidian's CSS variables, so the active theme
+   (e.g. ITS Theme) and the light/dark appearance setting apply automatically. No hard-coded colors. */
+
+.dmsr-card {
+  position: fixed;
+  right: var(--size-4-4);
+  bottom: var(--size-4-4);
+  z-index: var(--layer-notice); /* above modals and the settings window, so a preview is visible there too */
+  width: 340px;
+  max-width: calc(100vw - var(--size-4-8));
+  max-height: calc(100vh - var(--size-4-8));
+  overflow-y: auto;
+  padding: var(--size-4-4);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-medium);
+}
+
+.dmsr-title {
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--size-4-2);
+}
+
+.dmsr-empty {
+  color: var(--text-muted);
+  margin-bottom: var(--size-4-2);
+}
+
+.dmsr-hidden {
+  display: none !important; /* must beat the nested-list rules below */
+}
+
+.dmsr-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-2);
+}
+
+/* Keep the destructive-ish button out of the way of the primary one. */
+.dmsr-buttons .dmsr-stop {
+  margin-left: auto;
+}
+
+/* Slow, gentle attention bar along the top of the popup. */
+.dmsr-flash-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--size-4-2);
+  /* Always red, regardless of theme: ITS Theme's red, with the same value as a fallback. */
+  background-color: var(--callout-red, #c14343);
+  animation: dmsr-flash 1s step-end infinite;
+}
+
+/* Digital on/off: jumps between hidden and fully visible, no fading. */
+@keyframes dmsr-flash {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Steady: the "flash" setting is off, or the system asks for reduced motion. */
+.dmsr-flash-bar.dmsr-steady {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dmsr-flash-bar {
+    animation: none;
+  }
+}
+
+.dmsr-body {
+  padding-top: var(--size-4-2);
+}
+
+/* Modal variant: only the Obsidian modal chrome is used; contents share the classes above. */
+.dmsr-modal {
+  max-width: 420px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Status bar */
+.dmsr-status {
+  cursor: pointer;
+}
+
+/* Settings: checklist text box */
+.dmsr-textarea {
+  display: block;
+  width: 100%;
+  min-height: 12em;
+  margin-bottom: var(--size-4-4);
+  font-family: var(--font-monospace);
+  resize: vertical;
+}
+
+/* Rendered Markdown inside the popup */
+.dmsr-md {
+  margin-bottom: var(--size-4-3);
+}
+
+.dmsr-md > :first-child {
+  margin-top: 0;
+}
+
+.dmsr-md > :last-child {
+  margin-bottom: 0;
+}
+
+.dmsr-md ul,
+.dmsr-md ol {
+  margin-block: var(--size-4-1);
+}
+
+.dmsr-md li.task-list-item {
+  list-style: none;
+}
+
+.dmsr-md li.task-list-item::marker {
+  content: none;
+}
+
+/* Ticked items: greyed out and crossed out. Nested lists opt out so unticked children stay readable. */
+.dmsr-md li.task-list-item.is-checked {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+
+.dmsr-md li.task-list-item > ul,
+.dmsr-md li.task-list-item > ol {
+  display: inline-block;
+  width: 100%;
+  text-decoration: none;
+  color: var(--text-normal);
+}
+
+/* Completed-items toggle and section */
+.dmsr-toggle-row {
+  margin-bottom: var(--size-4-2);
+}
+
+.dmsr-completed {
+  margin-bottom: var(--size-4-3);
+  padding-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dmsr-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+  margin-top: var(--size-4-1);
+}
+
+.dmsr-preview {
+  margin-bottom: var(--size-4-4);
+  padding: var(--size-4-2) var(--size-4-3);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+}
+
+.dmsr-help {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  padding-left: var(--size-4-5);
+}
+
+.dmsr-help li {
+  margin-bottom: var(--size-4-2);
+}
+
+.dmsr-subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: var(--size-4-1);
+}
+
+.dmsr-completed ul {
+  margin: 0;
+}
