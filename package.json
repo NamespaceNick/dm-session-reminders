@@ -1,7 +1,7 @@
 {
   "name": "dm-session-reminders",
-  "version": "0.1.0",
-  "description": "Periodic popup reminders for Dungeon Masters, with a checklist of items to cover during a session.",
+  "version": "0.2.0",
+  "description": "Pop up reminders while you run a game session: on timers, or on creature turns and combat rounds with Initiative Tracker.",
   "main": "main.js",
   "private": true,
   "scripts": {

@@ -1,9 +1,9 @@
 {
   "id": "dm-session-reminders",
   "name": "DM Session Reminders",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.5.7",
-  "description": "Pop up a reminder checklist every X minutes while you run a game session.",
+  "description": "Pop up reminders while you run a game session: on timers, or on creature turns and combat rounds with Initiative Tracker.",
   "author": "NamespaceNick",
   "authorUrl": "https://github.com/NamespaceNick",
   "isDesktopOnly": false

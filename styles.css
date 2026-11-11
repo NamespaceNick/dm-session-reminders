@@ -189,3 +189,39 @@
 .dmsr-completed ul {
   margin: 0;
 }
+
+/* Settings: one block per reminder */
+.dmsr-reminder {
+  margin-bottom: var(--size-4-4);
+  padding: var(--size-4-1) var(--size-4-4) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+}
+
+.dmsr-reminder .setting-item {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.dmsr-rem-head .setting-item-info {
+  display: none;
+}
+
+.dmsr-rem-head .setting-item-control {
+  width: 100%;
+}
+
+.dmsr-name-input {
+  flex: 1 1 auto;
+  font-weight: var(--font-semibold);
+}
+
+.dmsr-details {
+  margin: var(--size-4-2) 0;
+}
+
+.dmsr-details > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  margin-bottom: var(--size-4-2);
+}

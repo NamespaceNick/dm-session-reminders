@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ReminderTimer, formatRemaining } from "./timer";
 import * as C from "./checklist";
-import { DEFAULT_TEXT, sanitizeData, clampInterval } from "./settings";
+import { DEFAULT_TEXT, MAX_REMINDERS, sanitizeData, clampInterval, createReminder } from "./settings";
+import { CombatWatcher, reminderMatchesCreature, reminderMatchesRound, remindersForCreature, resolveCreatureByName, CreatureSnap } from "./reminders";
 
 const MIN = 60_000;
 
@@ -113,20 +114,155 @@ describe("checklist", () => {
 });
 
 describe("settings", () => {
-  it("clamps interval and enums style", () => {
+  it("clamps interval", () => {
     expect(clampInterval(0)).toBe(1);
     expect(clampInterval(9999)).toBe(240);
     expect(clampInterval("abc")).toBe(15);
-    const d = sanitizeData({ intervalMinutes: "20", popupStyle: "evil", text: "- [ ] x" });
-    expect(d).toEqual({ intervalMinutes: 20, popupStyle: "card", flash: true, text: "- [ ] x" });
-    expect(sanitizeData({ flash: false }).flash).toBe(false);
-    expect(sanitizeData({ flash: "no" }).flash).toBe(true);
+  });
+  it("gives fresh installs one starter timer reminder", () => {
+    const d = sanitizeData(null);
+    expect(d.reminders).toHaveLength(1);
+    expect(d.reminders[0]).toMatchObject({ kind: "timer", enabled: true, intervalMinutes: 15, text: DEFAULT_TEXT });
+    expect(d.popupStyle).toBe("card");
+    expect(d.flash).toBe(true);
+  });
+  it("migrates v0.1 data (text + interval) into one timer reminder", () => {
+    const d = sanitizeData({ intervalMinutes: "20", popupStyle: "evil", text: "- [ ] x", flash: false });
+    expect(d.reminders).toHaveLength(1);
+    expect(d.reminders[0]).toMatchObject({ kind: "timer", intervalMinutes: 20, text: "- [ ] x", name: "Session checklist" });
+    expect(d.popupStyle).toBe("card");
+    expect(d.flash).toBe(false);
     expect(sanitizeData({ popupStyle: "modal" }).popupStyle).toBe("modal");
   });
-  it("uses starter text for fresh installs and migrates old items", () => {
-    expect(sanitizeData(null).text).toBe(DEFAULT_TEXT);
-    expect(sanitizeData({ items: [{ text: "a", done: true }] }).text).toBe("- [x] a\n");
-    expect(sanitizeData({ items: [] }).text).toBe("");
-    expect(sanitizeData({ text: 5 }).text).toBe(DEFAULT_TEXT);
+  it("migrates the oldest items list", () => {
+    expect(sanitizeData({ items: [{ text: "a", done: true }] }).reminders[0].text).toBe("- [x] a\n");
+    expect(sanitizeData({ items: [] }).reminders[0].text).toBe("");
+    expect(sanitizeData({ text: 5, intervalMinutes: 5 }).reminders[0].text).toBe(DEFAULT_TEXT);
+  });
+  it("sanitizes a reminders list: junk dropped, ids unique, fields clamped", () => {
+    const d = sanitizeData({
+      reminders: [
+        null,
+        "x",
+        { id: "a", kind: "initiative", creatureName: "Goblin 2", text: "t", enabled: false },
+        { id: "a", kind: "bogus", intervalMinutes: 9999, name: 5, text: 7 },
+      ],
+    });
+    expect(d.reminders).toHaveLength(2);
+    expect(d.reminders[0]).toMatchObject({ id: "a", kind: "initiative", creatureName: "Goblin 2", enabled: false });
+    expect(d.reminders[1].id).not.toBe("a");
+    expect(d.reminders[1]).toMatchObject({ kind: "timer", intervalMinutes: 240, name: "Timer reminder", text: "" });
+  });
+  it("keeps an empty list empty and caps the count", () => {
+    expect(sanitizeData({ reminders: [] }).reminders).toEqual([]);
+    const many = Array.from({ length: MAX_REMINDERS + 10 }, () => ({ kind: "timer" }));
+    expect(sanitizeData({ reminders: many }).reminders).toHaveLength(MAX_REMINDERS);
+  });
+});
+
+const snap = (id: string, name: string, active = false): CreatureSnap => ({ id, name, active });
+
+type Ev = ReturnType<CombatWatcher["update"]>;
+const turns = (ev: Ev) =>
+  ev.flatMap((e) => (e.type === "turn" ? [e.creature.name] : []));
+const rounds = (ev: Ev) =>
+  ev.flatMap((e) => (e.type === "round" ? ["round" + e.round] : []));
+
+describe("combat events", () => {
+  it("adopts the first snapshot without firing", () => {
+    const w = new CombatWatcher();
+    expect(w.update(true, 1, [snap("1", "Aria", true), snap("2", "Goblin")])).toEqual([]);
+  });
+  it("fires a turn once when the active creature changes, and not for unrelated updates", () => {
+    const w = new CombatWatcher();
+    w.update(true, 1, [snap("1", "Aria", true), snap("2", "Goblin")]);
+    expect(w.update(true, 1, [snap("1", "Aria", true), snap("2", "Goblin")])).toEqual([]);
+    expect(turns(w.update(true, 1, [snap("1", "Aria"), snap("2", "Goblin", true)]))).toEqual(["Goblin"]);
+    expect(w.update(true, 1, [snap("1", "Aria"), snap("2", "Goblin", true)])).toEqual([]);
+    expect(turns(w.update(true, 1, [snap("1", "Aria", true), snap("2", "Goblin")]))).toEqual(["Aria"]);
+  });
+  it("starting combat fires the start of the round, then the first turn", () => {
+    const w = new CombatWatcher();
+    w.update(false, 1, [snap("1", "Aria"), snap("2", "Goblin")]);
+    const ev = w.update(true, 1, [snap("1", "Aria", true), snap("2", "Goblin")]);
+    expect(rounds(ev)).toEqual(["round1"]);
+    expect(turns(ev)).toEqual(["Aria"]);
+    expect(ev[0].type).toBe("round");
+  });
+  it("a new round fires once, before the first creature's turn", () => {
+    const w = new CombatWatcher();
+    w.update(true, 1, [snap("1", "Aria"), snap("2", "Goblin", true)]);
+    const ev = w.update(true, 2, [snap("1", "Aria", true), snap("2", "Goblin")]);
+    expect(rounds(ev)).toEqual(["round2"]);
+    expect(turns(ev)).toEqual(["Aria"]);
+    expect(ev.map((e) => e.type)).toEqual(["round", "turn"]);
+  });
+  it("gives the same events when the round counter and the active creature update separately", () => {
+    const w = new CombatWatcher();
+    w.update(true, 1, [snap("1", "Aria"), snap("2", "Goblin", true)]);
+    expect(rounds(w.update(true, 2, [snap("1", "Aria"), snap("2", "Goblin", true)]))).toEqual(["round2"]);
+    expect(turns(w.update(true, 2, [snap("1", "Aria", true), snap("2", "Goblin")]))).toEqual(["Aria"]);
+  });
+  it("going back a round or stopping combat fires nothing round-related", () => {
+    const w = new CombatWatcher();
+    w.update(true, 3, [snap("1", "Aria", true)]);
+    expect(rounds(w.update(true, 2, [snap("1", "Aria", true)]))).toEqual([]);
+    expect(w.update(false, 2, [snap("1", "Aria", true)])).toEqual([]);
+  });
+  it("does not fire while combat is stopped, and re-arms after it restarts", () => {
+    const w = new CombatWatcher();
+    w.update(true, 1, [snap("1", "Aria", true)]);
+    expect(w.update(false, 1, [snap("1", "Aria", true)])).toEqual([]);
+    expect(turns(w.update(true, 1, [snap("1", "Aria", true)]))).toEqual(["Aria"]);
+  });
+  it("without a round counter (-1) only turns fire", () => {
+    const w = new CombatWatcher();
+    w.update(false, -1, [snap("1", "Aria")]);
+    const ev = w.update(true, -1, [snap("1", "Aria", true)]);
+    expect(rounds(ev)).toEqual([]);
+    expect(turns(ev)).toEqual(["Aria"]);
+  });
+});
+
+describe("round reminders", () => {
+  it("match by kind and enabled flag", () => {
+    const r = createReminder("round");
+    expect(reminderMatchesRound(r)).toBe(true);
+    expect(reminderMatchesRound({ ...r, enabled: false })).toBe(false);
+    expect(reminderMatchesRound(createReminder("initiative"))).toBe(false);
+  });
+  it("sanitize keeps round reminders and ignores the old start/end field", () => {
+    const d = sanitizeData({ reminders: [{ kind: "round", roundPoint: "end", text: "x" }] });
+    expect(d.reminders[0]).toMatchObject({ kind: "round", name: "Start of round", text: "x" });
+    expect(d.reminders[0]).not.toHaveProperty("roundPoint");
+  });
+});
+
+describe("initiative matching", () => {
+  const rem = (over: object) => createReminder("initiative", over);
+  it("matches by id first, then by name ignoring case and spacing", () => {
+    expect(reminderMatchesCreature(rem({ creatureId: "7", creatureName: "x" }), snap("7", "Other"))).toBe(true);
+    expect(reminderMatchesCreature(rem({ creatureName: " goblin 2 " }), snap("9", "Goblin 2"))).toBe(true);
+    expect(reminderMatchesCreature(rem({ creatureName: "Goblin 1" }), snap("9", "Goblin 2"))).toBe(false);
+  });
+  it("ignores disabled reminders, timer reminders and blank names", () => {
+    expect(reminderMatchesCreature(rem({ creatureName: "A", enabled: false }), snap("1", "A"))).toBe(false);
+    expect(reminderMatchesCreature(createReminder("timer", { creatureName: "A" }), snap("1", "A"))).toBe(false);
+    expect(reminderMatchesCreature(rem({ creatureName: "" }), snap("", ""))).toBe(false);
+  });
+  it("lists a creature's reminders including disabled ones", () => {
+    const a = rem({ creatureName: "A" });
+    const b = rem({ creatureName: "A", enabled: false });
+    const c = rem({ creatureName: "B" });
+    expect(remindersForCreature([a, b, c], snap("1", "A"))).toEqual([a, b]);
+  });
+  it("resolves a row name to one creature, using the row position only to break ties", () => {
+    const list = [snap("1", "Aria"), snap("2", "Goblin 1"), snap("3", "Goblin 1")];
+    expect(resolveCreatureByName(list, "Aria")?.id).toBe("1");
+    expect(resolveCreatureByName(list, "Goblin 1")).toBeNull();
+    expect(resolveCreatureByName(list, "Goblin 1", 2)?.id).toBe("3");
+    expect(resolveCreatureByName(list, "Goblin 1", 0)).toBeNull();
+    expect(resolveCreatureByName(list, "")).toBeNull();
+    expect(resolveCreatureByName(list, "Nobody")).toBeNull();
   });
 });

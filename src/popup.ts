@@ -6,8 +6,14 @@ export interface PopupHandlers {
   onToggle(taskIndex: number, done: boolean): void;
   onSnooze(): void;
   onStop(): void;
-  /** Current reminder interval, shown on the Snooze button. */
-  getIntervalMinutes(): number;
+  /** Heading of the popup (the reminder's name). */
+  title: string;
+  /** Shown when every box is ticked (empty string hides it). */
+  allDoneNote: string;
+  /** Label and tooltip of the main dismiss button ("Snooze (15m)" for a timer, "Dismiss" for an initiative reminder). */
+  getSnoozeLabel(): string;
+  getSnoozeTip(): string;
+  getDisableTip(): string;
 }
 
 export interface ReminderView {
@@ -45,16 +51,8 @@ class ReminderRenderer {
   }
 
   updateSnoozeLabel(): void {
-    this.snoozeBtn?.setText(this.snoozeLabel());
-    if (this.snoozeBtn) setTip(this.snoozeBtn, this.snoozeTip());
-  }
-
-  private snoozeTip(): string {
-    return `Close this and remind me again in ${this.h.getIntervalMinutes()} min`;
-  }
-
-  private snoozeLabel(): string {
-    return `⏰ Snooze (${this.h.getIntervalMinutes()}m)`;
+    this.snoozeBtn?.setText(this.h.getSnoozeLabel());
+    if (this.snoozeBtn) setTip(this.snoozeBtn, this.h.getSnoozeTip());
   }
 
   destroy(): void {
@@ -70,11 +68,11 @@ class ReminderRenderer {
 
     // Build off-screen, then swap in, so a re-render never flashes or collapses the popup.
     const frag = createDiv();
-    const title = frag.createDiv({ cls: "dmsr-title", text: "Session Reminder" });
+    const title = frag.createDiv({ cls: "dmsr-title", text: this.h.title });
     if (this.titleId) title.id = this.titleId;
     const md = frag.createDiv({ cls: "dmsr-md markdown-rendered" });
     if (text.trim() === "") {
-      md.createDiv({ cls: "dmsr-empty", text: "Nothing to show yet. Add your checklist in the plugin settings." });
+      md.createDiv({ cls: "dmsr-empty", text: "Nothing to show yet. Add your text in the plugin settings." });
     } else {
       await MarkdownRenderer.render(this.app, text, md, "", child);
     }
@@ -93,10 +91,10 @@ class ReminderRenderer {
 
     const note = frag.createDiv({
       cls: "dmsr-empty dmsr-hidden",
-      text: "All items done. Closing this will stop reminders.",
+      text: this.h.allDoneNote,
     });
     const boxes = Array.from(md.querySelectorAll<HTMLInputElement>("input.task-list-item-checkbox"));
-    const updateNote = () => note.toggleClass("dmsr-hidden", boxes.length === 0 || boxes.some((b) => !b.checked));
+    const updateNote = () => note.toggleClass("dmsr-hidden", this.h.allDoneNote === "" || boxes.length === 0 || boxes.some((b) => !b.checked));
 
     // The rendered boxes map to the text's task lines by order. If the counts disagree (an unusual
     // construct we don't parse), make the boxes read-only rather than risk editing the wrong line.
@@ -136,12 +134,12 @@ class ReminderRenderer {
     }
 
     const buttons = frag.createDiv({ cls: "dmsr-buttons" });
-    const snooze = buttons.createEl("button", { text: this.snoozeLabel(), cls: "mod-cta" });
+    const snooze = buttons.createEl("button", { text: this.h.getSnoozeLabel(), cls: "mod-cta" });
     this.snoozeBtn = snooze;
-    setTip(snooze, this.snoozeTip());
+    setTip(snooze, this.h.getSnoozeTip());
     snooze.addEventListener("click", () => this.h.onSnooze());
     const stop = buttons.createEl("button", { text: "🔕 Disable", cls: "dmsr-stop" });
-    setTip(stop, "End this session's reminders. Your ticked boxes are kept.");
+    setTip(stop, this.h.getDisableTip());
     stop.addEventListener("click", () => this.h.onStop());
 
     this.root.empty();
